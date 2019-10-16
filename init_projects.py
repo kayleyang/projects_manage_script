@@ -28,7 +28,7 @@ def get_projects():
             }
             projects.append(project)
         page = page + 1
-    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='mysql123', database='project',
+    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
                            charset='utf8mb4')
 
     query = 'select id, name, `group`, description, git, http from projects'
@@ -66,4 +66,5 @@ def get_item_from_db(project, results):
             return result
 
 
-get_projects()
+if __name__ == '__main__':
+    get_projects()

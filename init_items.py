@@ -5,9 +5,11 @@ import os
 import threading
 import pymysql
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
+
 threadLock = threading.Lock()
 
-work_dir = "C:/WorkSpaces/gitlab/"
+work_dir = "/root/gitlab/"
 
 groupId_cmd = "mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.groupId -q -DforceStdout -f "
 artifactId_cmd = "mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.artifactId -q -DforceStdout -f "
@@ -22,35 +24,27 @@ insert_items = "insert into items (project_id, name, pom, groupId, artifactId, v
 update_items = "update items set pom = %s, groupId = %s, artifactId = %s, version = %s, packaging = %s where name = %s and project_id = %s ;"
 
 def get_items():
-    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='mysql123', database='project',
+    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
                            charset='utf8mb4')
     cursor = conn.cursor()
     cursor.execute(query_projects)
     results = cursor.fetchall()
     cursor.close()
     conn.close()
+    executor = ThreadPoolExecutor(max_workers=16)
     for result in results:
         id = result[0]
         group = result[1]
         name = result[2]
         http = result[3]
         http = http.replace('http://', 'http://root:richgo30@', 1)
-        MyThread(id, group, name, http).start()
+        executor.submit(run, id, group, name, http)
 
 
-class MyThread(threading.Thread):
-    def __init__(self, id, group, name, http):
-        threading.Thread.__init__(self)
-        self.id = id
-        self.group = group
-        self.name = name
-        self.http = http
-
-    def run(self):
-        pull_project(self.group, self.name, self.http)
-        # print("结束处理: " + self.group + "/" + self.name)
-        poms = find_pom(self.group, self.name, "")
-        process_pom(self.id, poms)
+def run(id, group, name, http):
+    pull_project(group, name, http)
+    poms = find_pom(group, name, "")
+    process_pom(id, poms)
 
 
 def pull_project(group, project, http):
@@ -72,11 +66,11 @@ def pull_project(group, project, http):
             print(group + '/' + project, "===", subprocess.getoutput("git pull"))
         else:
             os.removedirs(project)
-            print(group + '/' + project, "=== 目录已存在，删除目录、git clone ", http)
-            print(group + '/' + project, "===", subprocess.getoutput("git clone " + http + " " + project_path))
+            print(group + '/' + project, "=== 目录已存在，删除目录、git clone -b master ", http)
+            print(group + '/' + project, "===", subprocess.getoutput("git clone -b master " + http + " " + project_path))
     else:
-        print(group + '/' + project, "=== 目录不存在，git clone", http)
-        print(group + '/' + project, "===", subprocess.getoutput("git clone " + http + " " + project_path))
+        print(group + '/' + project, "=== 目录不存在，git clone -b master", http)
+        print(group + '/' + project, "===", subprocess.getoutput("git clone -b master " + http + " " + project_path))
 
 
 def find_pom(group, project, inner_path):
@@ -99,7 +93,7 @@ def find_pom(group, project, inner_path):
 
 
 def process_pom(id, poms):
-    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='mysql123',
+    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password',
                            database='project',
                            charset='utf8mb4')
 
@@ -140,4 +134,5 @@ def process_pom(id, poms):
     conn.close()
 
 
-get_items()
+if __name__ == '__main__':
+    get_items()

@@ -3,19 +3,19 @@
 
 import pymysql
 import subprocess
-import threading
+from concurrent.futures import ThreadPoolExecutor
 
-work_dir = "D:/gitlab/"
+work_dir = "/root/gitlab/"
 dependency_cmd = "mvn dependency:list -f %s%s"
 
-query_items = 'select id, name, pom from items '
+query_items = 'select id, name, pom from items/* where id = 300 */'
 query_dependencies = 'select id, groupId, artifactId, version, scope from dependencies where item_id = %s '
 insert = 'insert into dependencies (item_id, groupId, artifactId, version, scope) values (%s, %s, %s, %s, %s)'
 update = 'update dependencies set version = %s , scope = %s where id = %s '
 
 
 def get_dependencies():
-    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='mysql123', database='project',
+    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
                            charset='utf8mb4')
 
     cursor = conn.cursor()
@@ -24,17 +24,9 @@ def get_dependencies():
     cursor.close()
     conn.close()
 
+    executor = ThreadPoolExecutor(max_workers=16)
     for result in results:
-        MyThread(result).start()
-
-
-class MyThread(threading.Thread):
-    def __init__(self, result):
-        threading.Thread.__init__(self)
-        self.result = result
-
-    def run(self):
-        process_item(self.result)
+        executor.submit(process_item, result)
 
 
 def process_item(item):
@@ -45,14 +37,14 @@ def process_item(item):
     print("查找依赖", item_name, cmd)
     dependencies = subprocess.getoutput(cmd)
 
-    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='mysql123', database='project',
+    conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
                            charset='utf8mb4')
     cursor = conn.cursor()
     cursor.execute(query_dependencies, item_id)
     results = cursor.fetchall()
     cursor.close()
     for line in dependencies.split('\n'):
-        if line.startswith('[INFO]    '):
+        if line.startswith('[INFO]    ') and len(line.split(':')) == 5:
             dependency = line[10:].split(':')
             dependency_groupId = dependency[0]
             dependency_artifactId = dependency[1]
@@ -77,4 +69,5 @@ def process_item(item):
     conn.close()
 
 
-get_dependencies()
+if __name__ == '__main__':
+    get_dependencies()
