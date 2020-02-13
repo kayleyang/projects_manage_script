@@ -102,7 +102,6 @@ def process_pom(id, poms):
     results = cursor.fetchall()
     cursor.close()
 
-    items = []
     for pom in poms:
         print("处理", pom)
         item = {
@@ -114,24 +113,30 @@ def process_pom(id, poms):
             "version": subprocess.getoutput(version_cmd + pom),
             "packaging": subprocess.getoutput(packaging_cmd + pom),
         }
-        items.append(item)
 
         cursor = conn.cursor()
-        if results is None or len(results) == 0:
+        result = get_item_from_db(item, results)
+        if result is None:
             print("插入", item)
             cursor.execute(insert_items, [item['project_id'], item['name'], item['pom'], item['groupId'], item['artifactId'],
                                           item['version'], item['packaging']])
         else:
-            for result in results:
-                if item['project_id'] == result[1] and item['name'] == result[2]:
-                    print("更新", item)
-                    cursor.execute(update_items, [item['pom'], item['groupId'], item['artifactId'],
-                                                  item['version'], item['packaging'], item['name'], item['project_id']])
-                    break
+            print("更新", item)
+            cursor.execute(update_items, [item['pom'], item['groupId'], item['artifactId'],
+                                          item['version'], item['packaging'], item['name'], item['project_id']])
 
         conn.commit()
         cursor.close()
     conn.close()
+
+
+
+def get_item_from_db(item, results):
+    if results is None or len(results) == 0:
+        return None
+    for result in results:
+        if item['project_id'] == result[1] and item['name'] == result[2]:
+            return result
 
 
 if __name__ == '__main__':
