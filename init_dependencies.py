@@ -4,14 +4,15 @@
 import pymysql
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+work_dir = '/root/gitlab/'
+dependency_cmd = 'mvn dependency:list -f %s%s'
 
-work_dir = "/root/gitlab/"
-dependency_cmd = "mvn dependency:list -f %s%s"
-
-query_items = 'select id, name, pom from items/* where id = 300 */'
+query_items = 'select id, name, pom from items /*where id = 370*/ '
 query_dependencies = 'select id, groupId, artifactId, version, scope from dependencies where item_id = %s '
 insert = 'insert into dependencies (item_id, groupId, artifactId, version, scope) values (%s, %s, %s, %s, %s)'
 update = 'update dependencies set version = %s , scope = %s where id = %s '
+delete_by_id = 'delete from dependencies where id = %s '
+delete_by_item = 'delete from dependencies where item_id = %s '
 
 
 def get_dependencies():
@@ -34,38 +35,65 @@ def process_item(item):
     item_name = item[1]
     item_pom = item[2]
     cmd = dependency_cmd % (work_dir, item_pom)
-    print("查找依赖", item_name, cmd)
-    dependencies = subprocess.getoutput(cmd)
+    print('--------------------------------------')
+    print(item_name, ' 查找依赖 ', cmd)
+    dependencies_lines = subprocess.getoutput(cmd)
 
     conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
                            charset='utf8mb4')
     cursor = conn.cursor()
     cursor.execute(query_dependencies, item_id)
-    results = cursor.fetchall()
+    dependencies_db = cursor.fetchall()
     cursor.close()
-    for line in dependencies.split('\n'):
+
+    cursor = conn.cursor()
+
+    dependencies = []
+    building_count = 0
+    for line in dependencies_lines.split('\n'):
+        if line.startswith('[INFO] Building'):
+            building_count = building_count + 1
+        if building_count >= 2:
+            break
         if line.startswith('[INFO]    ') and len(line.split(':')) == 5:
             dependency = line[10:].split(':')
-            dependency_groupId = dependency[0]
-            dependency_artifactId = dependency[1]
-            dependency_version = dependency[3]
-            dependency_scope = dependency[4]
+            dependencies.append(dependency)
 
-            has_data = False
-            cursor = conn.cursor()
-            for result in results:
-                if result[1] == dependency_groupId and result[2] == dependency_artifactId:
-                    has_data = True
-                    print('存在依赖', dependency)
-                    if result[3] != dependency_version or result[4] != dependency_scope:
-                        print('更新依赖', dependency)
-                        cursor.execute(update, [dependency_version, dependency_scope, result[0]])
+    if len(dependencies) == 0:
+        print(item_name, ' 没有依赖 itemId:', item_id, ' ', item_pom)
+        cursor.execute(delete_by_item, [item_id])
+    else:
+        for dependency in dependencies:
+            group_id = dependency[0]
+            artifact_id = dependency[1]
+            version = dependency[3]
+            scope = dependency[4]
+            is_in_db = False
+            for dependency_db in dependencies_db:
+                if dependency_db[1] == group_id and dependency_db[2] == artifact_id:
+                    is_in_db = True
+                    print(item_name, ' 存在依赖', dependency_db)
+                    if dependency_db[3] != version or dependency_db[4] != scope:
+                        print(item_name, ' 更新依赖', dependency_db)
+                        cursor.execute(update, [version, scope, dependency_db[0]])
                     break
-            if not has_data:
-                print('插入依赖', dependency)
-                cursor.execute(insert, [item_id, dependency_groupId, dependency_artifactId, dependency_version, dependency_scope])
-            conn.commit()
-            cursor.close()
+            if not is_in_db:
+                print(item_name, ' 插入依赖', dependency)
+                cursor.execute(insert, [item_id, group_id, artifact_id, version, scope])
+        for dependency_db in dependencies_db:
+            is_in_db = False
+            for dependency in dependencies:
+                group_id = dependency[0]
+                artifact_id = dependency[1]
+                if dependency_db[1] == group_id and dependency_db[2] == artifact_id:
+                    is_in_db = True
+                    break
+            if not is_in_db:
+                print(item_name, ' 移除依赖', dependency_db)
+                cursor.execute(delete_by_id, [dependency_db[0]])
+
+    conn.commit()
+    cursor.close()
     conn.close()
 
 

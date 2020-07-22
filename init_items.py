@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 threadLock = threading.Lock()
 
 work_dir = "/root/gitlab/"
+# work_dir = "D:/gitlab/"
 
 groupId_cmd = "mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.groupId -q -DforceStdout -f "
 artifactId_cmd = "mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.artifactId -q -DforceStdout -f "

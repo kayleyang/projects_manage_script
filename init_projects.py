@@ -4,8 +4,8 @@
 import requests
 import pymysql
 
-url = 'http://172.16.165.171/api/v3/'
-private_token = '?private_token=Lsk82z2hhokfgfa2XPH4'
+url = 'http://172.16.165.171/api/v4/'
+private_token = '?private_token=NFjuzxfWMQpgucj93kGh'
 
 
 def get_projects():
@@ -26,6 +26,8 @@ def get_projects():
                 'group': item['namespace']['name'],
                 'description': item['description']
             }
+            if 'front-end' in project['git']:
+                continue
             projects.append(project)
         page = page + 1
     conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
