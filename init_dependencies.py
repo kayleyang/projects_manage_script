@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 work_dir = '/root/gitlab/'
 dependency_cmd = 'mvn dependency:list -f %s%s'
 
-query_items = 'select id, name, pom from items /*where id = 370*/ '
+query_items = 'select id, name, pom from items /*where project_id in (102, 103)*/ '
 query_dependencies = 'select id, groupId, artifactId, version, scope from dependencies where item_id = %s '
 insert = 'insert into dependencies (item_id, groupId, artifactId, version, scope) values (%s, %s, %s, %s, %s)'
 update = 'update dependencies set version = %s , scope = %s where id = %s '
@@ -28,6 +28,7 @@ def get_dependencies():
     executor = ThreadPoolExecutor(max_workers=16)
     for result in results:
         executor.submit(process_item, result)
+        # process_item(result)
 
 
 def process_item(item):
@@ -76,10 +77,12 @@ def process_item(item):
                     if dependency_db[3] != version or dependency_db[4] != scope:
                         print(item_name, ' 更新依赖', dependency_db)
                         cursor.execute(update, [version, scope, dependency_db[0]])
+                        conn.commit()
                     break
             if not is_in_db:
                 print(item_name, ' 插入依赖', dependency)
                 cursor.execute(insert, [item_id, group_id, artifact_id, version, scope])
+                conn.commit()
         for dependency_db in dependencies_db:
             is_in_db = False
             for dependency in dependencies:
@@ -91,8 +94,8 @@ def process_item(item):
             if not is_in_db:
                 print(item_name, ' 移除依赖', dependency_db)
                 cursor.execute(delete_by_id, [dependency_db[0]])
+                conn.commit()
 
-    conn.commit()
     cursor.close()
     conn.close()
 

@@ -20,22 +20,24 @@ def get_projects():
             break
         for item in data:
             project = {
+                'id': item['id'],
                 'git': item['ssh_url_to_repo'],
                 'http': item['http_url_to_repo'],
                 'name': item['name'],
                 'group': item['namespace']['name'],
+                'namespace': item['namespace']['full_path'],
                 'description': item['description']
             }
-            if 'front-end' in project['git']:
-                continue
+            # if 'front-end' in project['git']:
+            #     continue
             projects.append(project)
         page = page + 1
     conn = pymysql.connect(host='172.16.162.211', port=3306, user='root', password='password', database='project',
                            charset='utf8mb4')
 
-    query = 'select id, name, `group`, description, git, http from projects'
-    update = 'update projects set description = %s, git = %s, http = %s where id = %s'
-    insert = "insert into projects (name, `group`, description, git, http) values (%s, %s, %s, %s, %s);"
+    query = 'select id, name, `group`, namespace, project_id, description, git, http from projects'
+    update = 'update projects set namespace = %s, project_id = %s, description = %s, git = %s, http = %s where id = %s'
+    insert = "insert into projects (name, `group`, namespace, project_id, description, git, http) values (%s, %s, %s, %s, %s, %s, %s);"
 
     cursor = conn.cursor()
     cursor.execute(query)
@@ -45,16 +47,17 @@ def get_projects():
         result = get_item_from_db(project, results)
         if result is not None:
             print('项目[', project['group'], '/', project['name'], '] 在数据库中已存在')
-            if project['description'] != result[3] or project['git'] != result[4] or project['http'] != result[5]:
+            if project['namespace'] != result[3] or project['id'] != result[4] or project['description'] != result[5] \
+                    or project['git'] != result[6] or project['http'] != result[7]:
                 cursor = conn.cursor()
                 print('更新 id 为', result[0], project)
-                cursor.execute(update, [project['description'], project['git'], project['http'], result[0]])
+                cursor.execute(update, [project['namespace'], project['id'], project['description'], project['git'], project['http'], result[0]])
                 conn.commit()
                 cursor.close()
         else:
             cursor = conn.cursor()
             print('插入', project)
-            cursor.execute(insert, [project['name'], project['group'], project['description'], project['git'], project['http']])
+            cursor.execute(insert, [project['name'], project['group'], project['namespace'], project['id'], project['description'], project['git'], project['http']])
             conn.commit()
             cursor.close()
     conn.close()
@@ -64,7 +67,7 @@ def get_item_from_db(project, results):
     if results is None or len(results) == 0:
         return None
     for result in results:
-        if project['name'] == result[1] and project['group'] == result[2]:
+        if project['name'] == result[1] and project['namespace'] == result[3]:
             return result
 
 

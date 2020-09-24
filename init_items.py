@@ -2,6 +2,7 @@
 # -*-coding:utf-8-*-
 
 import os
+import sys
 import threading
 import pymysql
 import subprocess
@@ -19,7 +20,7 @@ packaging_cmd = "mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -
 
 
 # query = 'select `group`, name, http from projects where id = 2'
-query_projects = 'select id, `group`, name, http from projects where `group` <> "front-end" and is_online = 1 and is_offline = 0 order by `group`, name;'
+query_projects = 'select id, `group`, name, http from projects where `group` <> "front-end" and is_online = 1 and is_offline = 0 /*and id in (120, 103)*/ order by `group`, name;'
 query_items = 'select id, project_id, name, pom, groupId, artifactId, version, packaging from items;'
 insert_items = "insert into items (project_id, name, pom, groupId, artifactId, version, packaging) values (%s, %s, %s, %s, %s, %s, %s);"
 update_items = "update items set pom = %s, groupId = %s, artifactId = %s, version = %s, packaging = %s where name = %s and project_id = %s ;"
@@ -40,6 +41,7 @@ def get_items():
         http = result[3]
         http = http.replace('http://', 'http://root:richgo30@', 1)
         executor.submit(run, id, group, name, http)
+        # run(id, group, name, http)
 
 
 def run(id, group, name, http):
@@ -67,10 +69,10 @@ def pull_project(group, project, http):
             print(group + '/' + project, "===", subprocess.getoutput("git pull"))
         else:
             os.removedirs(project)
-            print(group + '/' + project, "=== 目录已存在，删除目录、git clone -b master ", http)
+            print(group + '/' + project, "=== 目录已存在，删除目录.git clone -b master ", http + " " + project_path)
             print(group + '/' + project, "===", subprocess.getoutput("git clone -b master " + http + " " + project_path))
     else:
-        print(group + '/' + project, "=== 目录不存在，git clone -b master", http)
+        print(group + '/' + project, "=== 目录不存在，git clone -b master", http + " " + project_path)
         print(group + '/' + project, "===", subprocess.getoutput("git clone -b master " + http + " " + project_path))
 
 
