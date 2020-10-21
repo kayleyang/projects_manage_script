@@ -2,7 +2,6 @@
 # -*-coding:utf-8-*-
 
 import os
-import sys
 import threading
 import pymysql
 import subprocess
@@ -39,7 +38,7 @@ def get_items():
         group = result[1]
         name = result[2]
         http = result[3]
-        http = http.replace('http://', 'http://root:richgo30@', 1)
+        http = http.replace('http://', 'http://yangkai01:12345678@', 1)
         executor.submit(run, id, group, name, http)
         # run(id, group, name, http)
 
@@ -66,6 +65,7 @@ def pull_project(group, project, http):
         if os.path.exists(project_path + "/.git"):
             os.chdir(project_path)
             print(group + '/' + project, "=== 项目已存在，git pull")
+            # print(group + '/' + project, "===", subprocess.getoutput("git remote set-url origin " + http))
             print(group + '/' + project, "===", subprocess.getoutput("git pull"))
         else:
             os.removedirs(project)
